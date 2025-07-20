@@ -2,6 +2,7 @@ import axios from 'axios';
 import * as cheerio from 'cheerio';
 import { config } from 'dotenv';
 import { BaseTool, ToolSchema, ToolResult } from '../types/tool.js';
+import { cacheWithRedis } from '../utils/cache.js';
 
 // Load environment variables from .env file
 config();
@@ -47,6 +48,19 @@ export class SearchTool extends BaseTool {
       required: ['query']
     }
   };
+
+  private performSearch: (query: string, maxResults: number, apiKey: string) => Promise<SearchResult[]>;
+
+  constructor() {
+    super();
+    // Wrap the search logic with our cache.
+    // The original method is now cached, but the rest of the class can call it
+    // using `this.performSearch` as if nothing has changed.
+    this.performSearch = cacheWithRedis(
+      'search-tool', // This is the Redis key prefix
+      this._performSearch.bind(this) // The actual function to execute on a cache miss
+    );
+  }
 
   async execute(params: Record<string, any>): Promise<ToolResult> {
     try {
@@ -98,7 +112,7 @@ export class SearchTool extends BaseTool {
     }
   }
 
-  private async performSearch(query: string, maxResults: number, apiKey: string): Promise<SearchResult[]> {
+  private async _performSearch(query: string, maxResults: number, apiKey: string): Promise<SearchResult[]> {
     try {
       // Use Brave Web Search API
       const response = await axios.get('https://api.search.brave.com/res/v1/web/search', {

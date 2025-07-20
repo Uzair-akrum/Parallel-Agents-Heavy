@@ -7,7 +7,7 @@ import { Config } from '../types/config.js';
 dotenv.config();
 
 // Helper function to get environment variable with type conversion
-function getEnvVar(key: string, defaultValue?: any, type: 'string' | 'number' | 'boolean' = 'string'): any {
+export function getEnvVar(key: string, defaultValue?: any, type: 'string' | 'number' | 'boolean' = 'string'): any {
   const value = process.env[key];
 
   if (value === undefined) {
@@ -72,6 +72,11 @@ export async function loadConfig(path: string = 'config.yaml'): Promise<Config> 
     max_length: getEnvVar('INPUT_MAX_LENGTH', config.input?.max_length || 10000, 'number'),
     multiline: getEnvVar('INPUT_MULTILINE', config.input?.multiline || true, 'boolean'),
     editor_command: getEnvVar('INPUT_EDITOR_COMMAND', config.input?.editor_command || 'code --wait')
+  };
+
+  // Add Redis configuration
+  config.redis = {
+    url: getEnvVar('REDIS_URL', config.redis?.url || 'redis://localhost:6379')
   };
 
   // Keep prompts from config file (these are usually not environment-specific)
@@ -181,7 +186,8 @@ export function validateConfig(config: Config): void {
   const required = [
     'openrouter.api_key',
     'openrouter.base_url',
-    'openrouter.model'
+    'openrouter.model',
+    'redis.url'
   ];
 
   for (const field of required) {

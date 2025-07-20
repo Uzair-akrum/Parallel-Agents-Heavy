@@ -22,4 +22,10 @@ TOOLS_CALCULATOR_PRECISION=10
 INPUT_TYPE=text
 INPUT_MAX_LENGTH=10000
 INPUT_MULTILINE=true
-INPUT_EDITOR_COMMAND=code --wait 
+INPUT_EDITOR_COMMAND=code --wait
+
+# Redis Configuration
+REDIS_URL=redis://localhost:6379
+
+# Search API Configuration
+BRAVE_SEARCH_API_KEY=your-brave-search-api-key-here 

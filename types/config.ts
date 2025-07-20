@@ -38,6 +38,10 @@ export interface PromptsConfig {
   synthesis_prompt: string;
 }
 
+export interface RedisConfig {
+  url: string;
+}
+
 export interface Config {
   openrouter: OpenRouterConfig;
   agent: AgentConfig;
@@ -45,4 +49,5 @@ export interface Config {
   tools: ToolsConfig;
   input: InputConfig;
   prompts: PromptsConfig;
+  redis: RedisConfig;
 } 
