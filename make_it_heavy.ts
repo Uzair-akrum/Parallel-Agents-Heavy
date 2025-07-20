@@ -3,6 +3,8 @@ import { Orchestrator } from './orchestrator.js';
 import { loadConfig, validateConfig } from './utils/config.js';
 import { toolRegistry } from './tools/index.js';
 import { Config } from './types/config.js';
+import fs from 'fs/promises';
+import path from 'path';
 
 interface UserInput {
   userInput: string;
@@ -102,6 +104,9 @@ class MultiAgentCLI {
         console.log('='.repeat(50));
         console.log(response_text);
         console.log('='.repeat(50) + '\n');
+
+        // Save response to markdown file with title
+        await this.saveResponseToMarkdown(userInput, response_text, duration);
 
       } catch (error) {
         if (error instanceof Error && error.message.includes('canceled')) {
@@ -396,6 +401,62 @@ class MultiAgentCLI {
     if (query.length > 200) complexity += 1;
 
     return Math.min(complexity, 5); // Cap at 5
+  }
+
+  private async saveResponseToMarkdown(query: string, response: string, duration: string): Promise<void> {
+    if (!this.config) {
+      console.error('Config not loaded, cannot save response.');
+      return;
+    }
+
+    const timestamp = new Date().toISOString().replace(/[:.-]/g, '');
+    const filename = `chat-${timestamp}.md`;
+    const outputDir = path.join(process.cwd(), 'responses');
+
+    try {
+      const fullPath = path.join(outputDir, filename);
+      await fs.mkdir(outputDir, { recursive: true });
+
+      // Generate a title using a simple approach (we could enhance this to call the LLM)
+      const title = this.generateChatTitle(query);
+
+      const markdownContent = `# ${title}
+
+**Query:**
+${query}
+
+**Multi-Agent Response:**
+${response}
+
+**Processing Duration:** ${duration}s
+
+**Timestamp:** ${new Date().toISOString()}
+`;
+
+      await fs.writeFile(fullPath, markdownContent);
+      console.log(`📄 Response saved to: ${path.relative(process.cwd(), fullPath)}`);
+    } catch (error) {
+      console.error('❌ Failed to save response to markdown file:', error instanceof Error ? error.message : 'Unknown error');
+    }
+  }
+
+  private generateChatTitle(query: string): string {
+    // Simple title generation - could be enhanced to call LLM for better titles
+    const words = query.split(' ').slice(0, 8); // Take first 8 words
+    let title = words.join(' ');
+
+    // Clean up title
+    title = title.replace(/[^\w\s-]/g, '').trim();
+
+    // Capitalize first letter
+    title = title.charAt(0).toUpperCase() + title.slice(1);
+
+    // Add ellipsis if truncated
+    if (words.length < query.split(' ').length) {
+      title += '...';
+    }
+
+    return title || 'Multi-Agent Chat';
   }
 }
 
