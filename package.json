@@ -1,0 +1,43 @@
+{
+  "name": "make-it-heavy-ts",
+  "version": "1.0.0",
+  "description": "Multi-agent AI system converted from Python to TypeScript",
+  "main": "dist/main.js",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx main.ts",
+    "dev:heavy": "tsx make_it_heavy.ts",
+    "build": "tsc",
+    "start": "node dist/main.js",
+    "start:heavy": "node dist/make_it_heavy.js"
+  },
+  "dependencies": {
+    "@ai-sdk/openai": "^0.0.39",
+    "@langchain/community": "^0.2.0",
+    "@langchain/core": "^0.2.0",
+    "@langchain/openai": "^0.2.0",
+    "ai": "^3.4.33",
+    "axios": "^1.6.8",
+    "cheerio": "^1.0.0-rc.12",
+    "dotenv": "^17.2.0",
+    "enquirer": "^2.4.1",
+    "js-yaml": "^4.1.0",
+    "mathjs": "^12.4.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/js-yaml": "^4.0.9",
+    "@types/node": "^20.11.0",
+    "ts-node": "^10.9.2",
+    "tsx": "^4.20.3",
+    "typescript": "^5.4.0"
+  },
+  "keywords": [
+    "ai",
+    "agents",
+    "typescript",
+    "langchain"
+  ],
+  "author": "",
+  "license": "MIT"
+}
