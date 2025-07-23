@@ -1,5 +1,5 @@
-import fs from 'fs/promises';
-import path from 'path';
+import * as fs from 'fs/promises';
+import * as path from 'path';
 import { BaseTool, ToolSchema, ToolResult } from '../types/tool.js';
 
 export class ReadFileTool extends BaseTool {

@@ -40,6 +40,7 @@ export interface PromptsConfig {
 
 export interface RedisConfig {
   url: string;
+  ttl?: number; // Time to live in seconds, defaults to 3600 (1 hour)
 }
 
 export interface Config {
