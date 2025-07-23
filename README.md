@@ -1,11 +1,11 @@
-# Make It Heavy - TypeScript Multi-Agent AI System
+# Make It Heavy - TypeScript Multi-Agent AI Research System
 
-A powerful TypeScript implementation of the "Make It Heavy" multi-agent AI system, converted from Python with modern tooling and type safety.
+A powerful TypeScript implementation of an advanced multi-agent AI research orchestrator with Lead Agent coordination, specialized search subagents, automatic citations, and comprehensive logging capabilities.
 
 ## 🚀 Features
 
 - **🤖 Single Agent Mode**: Fast, direct AI interactions for simple queries
-- **🎭 Multi-Agent Mode**: Complex query processing with parallel specialized agents
+- **🔬 Enhanced Multi-Agent Research Orchestrator**: Advanced research system with Lead Agent coordination, specialized search subagents, automatic citations, and comprehensive logging
 - **🔧 Tool System**: Extensible tool ecosystem with calculator, search, and file operations
 - **⚡ TypeScript**: Full type safety and modern ES modules
 - **🎯 OpenRouter Support**: Compatible with multiple AI models via OpenRouter
@@ -37,13 +37,41 @@ npm install
 ### 2. Install Dependencies
 ```bash
 # Install all required packages
-npm install @langchain/core @langchain/openai @langchain/community @ai-sdk/openai ai js-yaml cheerio axios mathjs enquirer zod
+npm install @langchain/core @langchain/openai @langchain/community @ai-sdk/openai ai js-yaml cheerio axios mathjs enquirer zod ioredis
 
 # Install development dependencies
-npm install --save-dev typescript ts-node @types/node @types/js-yaml
+npm install --save-dev typescript ts-node @types/node @types/js-yaml @types/ioredis
 ```
 
-### 3. Configuration
+### 3. Setup Redis (Required for Enhanced Multi-Agent Mode)
+
+The enhanced orchestrator requires Redis for memory persistence and session management:
+
+**Option 1: Docker (Recommended)**
+```bash
+docker run -d --name redis-make-it-heavy -p 6379:6379 redis:alpine
+```
+
+**Option 2: Local Installation**
+```bash
+# Ubuntu/Debian
+sudo apt update && sudo apt install redis-server
+sudo systemctl start redis-server
+
+# macOS
+brew install redis
+brew services start redis
+
+# Windows
+# Download and install from https://redis.io/download
+```
+
+**Test Redis Connection:**
+```bash
+redis-cli ping  # Should return "PONG"
+```
+
+### 4. Configuration
 
 Edit `config.yaml` with your API credentials:
 
@@ -61,6 +89,10 @@ agent:
 orchestrator:
   max_agents: 5
   synthesis_model: "anthropic/claude-3.5-sonnet:beta"
+
+redis:
+  url: "redis://localhost:6379"  # Redis server for memory persistence
+  ttl: 3600                      # Session TTL in seconds (1 hour)
 ```
 
 ## 🎯 Usage
@@ -76,16 +108,33 @@ Example interactions:
 - "Search for the latest TypeScript features"
 - "Read the contents of package.json"
 
-### Multi-Agent Mode
-For complex queries requiring research and analysis:
+### Enhanced Multi-Agent Research Orchestrator
+For complex queries requiring comprehensive research with citations:
 ```bash
 npm run dev:heavy
 ```
 
-Example complex queries:
-- "Compare Python, TypeScript, and Rust for web API development"
-- "Analyze renewable energy trends and market opportunities"
-- "Create a comprehensive machine learning study plan"
+**Features:**
+- **Lead Agent Coordination**: Intelligent research planning and task breakdown
+- **Parallel Search Subagents**: Specialized agents for targeted web research
+- **Automatic Citations**: Inline references and bibliography generation
+- **Adaptive Configuration**: Resource allocation based on query complexity
+- **Comprehensive Logging**: Detailed tracking of every research step
+- **Memory Persistence**: Session management and progress tracking
+
+Example research queries:
+- "Compare Python, TypeScript, and Rust for web API development with performance metrics and use cases"
+- "Analyze renewable energy trends, market opportunities, and investment strategies with current data"
+- "Create a comprehensive machine learning study plan with resources, timeline, and project ideas"
+
+**CLI Commands:**
+- `help` - Show available commands
+- `research` - Show research system help
+- `status` - List all active research sessions
+- `status <id>` - Check specific research status
+- `result <id>` - Get completed research result
+- `examples` - Show example complex queries
+- `config` - Show current configuration
 
 ## 🔧 Available Tools
 
@@ -102,41 +151,67 @@ Example complex queries:
 make-it-heavy-ts/
 ├── types/                 # TypeScript interfaces
 │   ├── config.ts         # Configuration types
-│   └── tool.ts           # Tool system types
+│   ├── tool.ts           # Tool system types
+│   └── schemas.ts        # Research system schemas
+├── agents/               # Specialized agent system
+│   ├── base.ts          # Base agent class
+│   ├── lead.ts          # Lead Research Agent
+│   ├── search.ts        # Search Subagent
+│   └── citation.ts      # Citation Agent
 ├── utils/                # Utility functions
-│   └── config.ts         # Config loading
+│   ├── config.ts        # Config loading
+│   ├── memory.ts        # Redis memory store
+│   ├── prompts.ts       # Agent-specific prompts
+│   └── progress.ts      # Progress display
 ├── tools/                # Tool implementations
-│   ├── calculator.ts     # Math operations
-│   ├── search.ts         # Web search
-│   ├── file.ts           # File operations
-│   └── index.ts          # Tool registry
-├── agent.ts              # Core AI agent
-├── orchestrator.ts       # Multi-agent coordinator
+│   ├── calculator.ts    # Math operations
+│   ├── search.ts        # Web search (enhanced)
+│   ├── file.ts          # File operations
+│   └── index.ts         # Tool registry
+├── agent.ts              # Legacy agent (extends BaseAgent)
+├── orchestrator.ts       # Enhanced research coordinator
 ├── main.ts               # Single-agent CLI
-├── make_it_heavy.ts      # Multi-agent CLI
+├── make_it_heavy.ts      # Enhanced multi-agent CLI
 ├── config.yaml           # Configuration
 └── package.json          # Dependencies
 ```
 
-## 🔄 How Multi-Agent Mode Works
+## 🔄 How Enhanced Multi-Agent Research Works
 
-1. **📋 Query Analysis**: The orchestrator breaks complex questions into focused sub-tasks
-2. **🚀 Parallel Processing**: Multiple agents work on sub-tasks simultaneously
-3. **🔄 Synthesis**: Results are combined into a comprehensive final answer
+The system uses a sophisticated multi-tier architecture for comprehensive research:
+
+1. **🧠 Lead Agent Planning**: Creates detailed research plans with specialized subtasks
+2. **🔍 Parallel Search Execution**: Multiple search subagents conduct targeted research
+3. **📊 Quality Evaluation**: Results are scored and filtered for relevance and authority
+4. **🔄 Iterative Research**: Follow-up tasks generated based on initial findings
+5. **📝 Synthesis**: Lead agent integrates all findings into coherent reports
+6. **📚 Citation Integration**: Citation agent adds inline references and bibliography
+
+**Adaptive Configuration:**
+- High complexity queries: 4 subagents, 3 iterations
+- Medium complexity queries: 3 subagents, 2 iterations  
+- Low complexity queries: 2 subagents, 1 iteration
 
 ```mermaid
 graph TD
-    A[Complex Query] --> B[Orchestrator]
-    B --> C[Sub-task 1]
-    B --> D[Sub-task 2] 
-    B --> E[Sub-task 3]
-    C --> F[Agent 1]
-    D --> G[Agent 2]
-    E --> H[Agent 3]
-    F --> I[Synthesis Agent]
-    G --> I
-    H --> I
-    I --> J[Final Answer]
+    A[Research Query] --> B[Lead Agent]
+    B --> C[Research Plan]
+    C --> D[Search Subagent 1]
+    C --> E[Search Subagent 2]
+    C --> F[Search Subagent 3]
+    D --> G[Web Search & Analysis]
+    E --> H[Web Search & Analysis]
+    F --> I[Web Search & Analysis]
+    G --> J[Lead Agent Synthesis]
+    H --> J
+    I --> J
+    J --> K[Citation Agent]
+    K --> L[Final Report with Citations]
+    
+    style B fill:#e1f5fe
+    style J fill:#f3e5f5
+    style K fill:#fff3e0
+    style L fill:#e8f5e8
 ```
 
 ## ⚙️ Development
@@ -292,6 +367,12 @@ tools.my_tool = tool({
    - Reduce `max_iterations` in config
    - Increase `max_execution_time` for complex queries
 
+5. **Redis connection errors (Enhanced Mode)**:
+   - Ensure Redis server is running: `redis-cli ping`
+   - Check Redis URL in config.yaml
+   - For Docker: `docker ps` to verify container is running
+   - Restart Redis: `sudo systemctl restart redis-server` (Linux)
+
 ### Debug Mode
 Enable verbose logging by setting environment variable:
 ```bash
@@ -313,17 +394,34 @@ DEBUG=true npm run dev
 "Create a TODO list file with 5 items for my project"
 ```
 
-### Multi-Agent Examples
+### Enhanced Multi-Agent Research Examples
 ```bash
-# Research Analysis
-"Compare the top 3 JavaScript frameworks for 2024, including performance benchmarks, learning curves, and job market demand"
+# Comprehensive Research Analysis (with citations)
+"Compare the top 3 JavaScript frameworks for 2024, including performance benchmarks, learning curves, job market demand, and provide sources for all claims"
 
-# Business Strategy
-"I want to start an AI consulting business. Research the market, identify niches, suggest services, and create a pricing strategy"
+# Business Strategy Research
+"I want to start an AI consulting business. Research the current market landscape, identify profitable niches, suggest service offerings, create a pricing strategy, and provide industry data with sources"
 
-# Technical Planning
-"Plan a migration from React to Next.js for a large e-commerce site, including timeline, risks, and best practices"
+# Technical Planning with Evidence
+"Plan a migration from React to Next.js for a large e-commerce site, including detailed timeline, risk assessment, performance impact analysis, and cite best practices from authoritative sources"
+
+# Academic-Style Research
+"Analyze the environmental impact of cryptocurrency mining, including energy consumption data, carbon footprint studies, and proposed solutions with full citations"
 ```
+
+Each query will automatically:
+- Generate a detailed research plan with subtasks
+- Execute parallel searches with multiple specialized agents
+- Evaluate and score sources for quality and relevance
+- Synthesize findings into a comprehensive report
+- Add inline citations and generate a bibliography
+- Save results with metadata for future reference
+
+**Output Files:**
+- Research reports saved as `research-[timestamp].md` in `responses/` directory
+- Complete with inline citations, bibliography, and metadata
+- Searchable research history with unique research IDs
+- Session persistence allows resuming interrupted research
 
 ## 🤝 Contributing
 
