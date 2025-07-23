@@ -23,7 +23,7 @@ export class SearchSubAgent extends BaseAgent {
     console.log(`🎯 [SEARCH AGENT] Objective: ${task.objective}`);
     console.log(`🔍 [SEARCH AGENT] Search Focus: ${task.search_focus}`);
     console.log(`📋 [SEARCH AGENT] Expected Output: ${task.expected_output_format}`);
-    console.log(`🔢 [SEARCH AGENT] Max Searches: ${task.max_searches || 5}`);
+    console.log(`🔢 [SEARCH AGENT] Max Searches: ${task.max_searches || 8}`);
 
     const startTime = Date.now();
     let totalTokens = 0;
@@ -43,7 +43,7 @@ export class SearchSubAgent extends BaseAgent {
       // Step 2: Perform searches
       console.log(`\n🌐 [SEARCH AGENT] STEP 2: Performing web searches...`);
       const searchStartTime = Date.now();
-      const searchResults = await this._performSearches(searchQueries, task.max_searches || 5);
+      const searchResults = await this._performSearches(searchQueries, task.max_searches || 8);
       const searchDuration = Date.now() - searchStartTime;
 
       console.log(`✅ [SEARCH AGENT] Found ${searchResults.length} results in ${searchDuration}ms:`);
@@ -88,7 +88,7 @@ export class SearchSubAgent extends BaseAgent {
         : 0;
       console.log(`   - Average confidence: ${avgConfidence.toFixed(3)} (minimum: 0.6)`);
 
-      if (!hasSufficientInfo && searchResults.length < (task.max_searches || 5)) {
+      if (!hasSufficientInfo && searchResults.length < (task.max_searches || 8)) {
         console.log(`🔄 [SEARCH AGENT] Insufficient information detected - additional searches could be triggered`);
         // Could trigger additional search round here if needed
       }
@@ -143,34 +143,43 @@ export class SearchSubAgent extends BaseAgent {
    */
   private async _generateSearchQueries(task: SubAgentTask): Promise<string[]> {
     const queryPrompt = `
-Generate 3-5 targeted search queries for this research task:
+Generate 3-5 targeted search queries for this research task. Focus on creating KEYWORD-BASED queries that search engines will understand, not full sentences or instructions.
 
 **Objective:** ${task.objective}
 **Search Focus:** ${task.search_focus}
 **Expected Output:** ${task.expected_output_format}
 
-Create search queries that:
-1. Cover different aspects of the topic
-2. Use specific terminology and keywords
-3. Are likely to find authoritative sources
-4. Avoid redundancy
-5. Consider different perspectives
+IMPORTANT GUIDELINES:
+1. Use KEYWORDS and PHRASES, not full sentences
+2. Avoid instructional words like "find", "search for", "identify", "look for"
+3. Include specific terms, company names, dates, numbers
+4. Add temporal constraints (2024, 2025, recent) for current information
+5. Use quotes for exact phrases when needed
+6. Consider different aspects and synonyms
 
-Respond with a JSON array of search query strings:
+GOOD EXAMPLES:
+- "top AI startups 2024 funding"
+- "unicorn startups artificial intelligence 2025"
+- "venture capital AI companies Forbes TechCrunch"
+
+BAD EXAMPLES:
+- "Identify the top 3 AI startups recognized by authoritative media"
+- "Find information about recent AI startup funding"
+- "Search for the best artificial intelligence companies"
+
+Respond with a JSON array of KEYWORD-BASED search query strings:
 ["query 1", "query 2", "query 3", ...]
 
-Focus on creating queries that will find high-quality, relevant information sources.
+Focus on creating queries that search engines will rank highly for relevant, authoritative sources.
 `;
 
     const result = await this.think(queryPrompt);
 
     if (result.error) {
-      // Fallback queries based on the task
-      return [
-        task.objective,
-        `${task.search_focus} ${task.objective}`,
-        `research ${task.objective}`
-      ];
+      // Improved fallback queries with keyword focus
+      const keywordQueries = this._generateKeywordFallbackQueries(task);
+      console.log(`[SEARCH AGENT] Query generation failed, using keyword fallbacks: ${keywordQueries.join(', ')}`);
+      return keywordQueries;
     }
 
     // Extract query array from result
@@ -189,16 +198,89 @@ Focus on creating queries that will find high-quality, relevant information sour
       }
     }
 
-    // Ensure we have valid queries
+    // Ensure we have valid queries and optimize them
     if (!Array.isArray(queries) || queries.length === 0) {
-      queries = [task.objective];
+      queries = this._generateKeywordFallbackQueries(task);
     }
 
-    return queries.slice(0, 5); // Limit to 5 queries max
+    // Clean and optimize the queries
+    const optimizedQueries = queries
+      .slice(0, 5) // Limit to 5 queries max
+      .map((q: string) => this._optimizeQueryForSearch(q, task))
+      .filter((q: string) => q.length > 0);
+
+    return optimizedQueries.length > 0 ? optimizedQueries : this._generateKeywordFallbackQueries(task);
   }
 
   /**
-   * Perform web searches using the search tool
+   * Generate keyword-focused fallback queries
+   */
+  private _generateKeywordFallbackQueries(task: SubAgentTask): string[] {
+    const objective = task.objective.toLowerCase();
+    const focus = task.search_focus.toLowerCase();
+
+    // Extract key terms
+    const keyTerms = this._extractKeyTermsFromTask(objective, focus);
+
+    const queries: string[] = [];
+
+    // Primary query: main keywords
+    queries.push(keyTerms.slice(0, 4).join(' '));
+
+    // Secondary query: add temporal constraints
+    queries.push(`${keyTerms.slice(0, 3).join(' ')} 2024 2025`);
+
+    // Tertiary query: add authority sources
+    if (objective.includes('startup') || objective.includes('company')) {
+      queries.push(`${keyTerms.slice(0, 3).join(' ')} TechCrunch Forbes`);
+    }
+
+    return queries.slice(0, 3);
+  }
+
+  /**
+   * Extract key terms from task objective and focus
+   */
+  private _extractKeyTermsFromTask(objective: string, focus: string): string[] {
+    const combined = `${objective} ${focus}`;
+    const stopWords = new Set(['the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by', 'from', 'find', 'search', 'identify', 'look', 'get', 'information', 'about', 'that', 'this', 'are', 'is', 'was', 'were', 'have', 'has', 'had', 'will', 'would', 'could', 'should']);
+
+    return combined
+      .toLowerCase()
+      .split(/\s+/)
+      .map(word => word.replace(/[^\w]/g, ''))
+      .filter(word => word.length > 2 && !stopWords.has(word))
+      .slice(0, 6);
+  }
+
+  /**
+   * Optimize individual query for search engines
+   */
+  private _optimizeQueryForSearch(query: string, task: SubAgentTask): string {
+    // Remove instructional phrases
+    let optimized = query
+      .replace(/^(please\s+|can you\s+|search for\s+|find\s+|identify\s+|look for\s+|get\s+)/i, '')
+      .replace(/\s+(please|thanks?|thank you)$/i, '')
+      .trim();
+
+    // If it's still a full sentence, extract keywords
+    if (optimized.split(' ').length > 6 || optimized.includes('?')) {
+      const keyTerms = this._extractKeyTermsFromTask(optimized, '');
+      optimized = keyTerms.join(' ');
+    }
+
+    // Add temporal constraints for competitive queries
+    if (task.objective.toLowerCase().includes('top') || task.objective.toLowerCase().includes('best') || task.objective.toLowerCase().includes('recent')) {
+      if (!optimized.includes('2024') && !optimized.includes('2025')) {
+        optimized += ' 2024 2025';
+      }
+    }
+
+    return optimized;
+  }
+
+  /**
+   * Perform web searches using the enhanced search tool
    */
   private async _performSearches(queries: string[], maxResults: number): Promise<SearchResult[]> {
     const resultsPerQuery = Math.ceil(maxResults / queries.length);
@@ -206,24 +288,33 @@ Focus on creating queries that will find high-quality, relevant information sour
 
     console.log(`[SEARCH AGENT] Executing ${queries.length} searches with ~${resultsPerQuery} results each`);
 
-    // Perform searches in parallel
-    const searchPromises = queries.map(async (query) => {
+    // Perform searches sequentially to respect rate limits (not parallel)
+    const searchResultArrays: SearchResult[][] = [];
+
+    for (const query of queries) {
       try {
         console.log(`[SEARCH AGENT] Searching: "${query}"`);
-        const searchResponse = await this.run(`Please search for: ${query}`, 1);
+
+        // Call the search tool directly with optimization enabled
+        const searchResult = await this._callLLM([
+          { role: 'system', content: 'You are a search assistant. Use the search tool to find information.' },
+          { role: 'user', content: query }
+        ], {
+          maxTokens: 1000,
+          temperature: 0.1,
+          tools: true
+        });
 
         // Parse search results from response
-        const results = this._parseSearchResponse(searchResponse, query);
+        const results = this._parseSearchResponse(searchResult.text, query);
         console.log(`[SEARCH AGENT] Found ${results.length} results for: "${query}"`);
 
-        return results;
+        searchResultArrays.push(results);
       } catch (error) {
         console.warn(`[SEARCH AGENT] Search failed for "${query}": ${error}`);
-        return [];
+        searchResultArrays.push([]);
       }
-    });
-
-    const searchResultArrays = await Promise.all(searchPromises);
+    }
 
     // Flatten and deduplicate results
     for (const resultArray of searchResultArrays) {
@@ -234,7 +325,89 @@ Focus on creating queries that will find high-quality, relevant information sour
       }
     }
 
+    // If we didn't get enough results, try additional refined searches
+    if (allResults.length < maxResults * 0.6 && allResults.length < maxResults) {
+      console.log(`[SEARCH AGENT] Initial search yielded ${allResults.length} results, trying refinements...`);
+
+      const additionalQueries = this._generateRefinedQueries(queries, allResults);
+
+      for (const refinedQuery of additionalQueries) {
+        if (allResults.length >= maxResults) break;
+
+        try {
+          console.log(`[SEARCH AGENT] Refined search: "${refinedQuery}"`);
+
+          // Add a small delay between refined searches to be extra safe with rate limits
+          await new Promise(resolve => setTimeout(resolve, 500));
+
+          const searchResult = await this._callLLM([
+            { role: 'system', content: 'You are a search assistant. Use the search tool to find information.' },
+            { role: 'user', content: refinedQuery }
+          ], {
+            maxTokens: 1000,
+            temperature: 0.1,
+            tools: true
+          });
+
+          const results = this._parseSearchResponse(searchResult.text, refinedQuery);
+          console.log(`[SEARCH AGENT] Refined search found ${results.length} additional results`);
+
+          // Add new unique results
+          for (const result of results) {
+            if (!allResults.some(existing => existing.url === result.url) && allResults.length < maxResults) {
+              allResults.push(result);
+            }
+          }
+        } catch (error) {
+          console.warn(`[SEARCH AGENT] Refined search failed for "${refinedQuery}": ${error}`);
+          continue;
+        }
+      }
+    }
+
     return allResults.slice(0, maxResults);
+  }
+
+  /**
+   * Generate refined queries based on initial results
+   */
+  private _generateRefinedQueries(originalQueries: string[], currentResults: SearchResult[]): string[] {
+    const refinedQueries: string[] = [];
+
+    // Extract successful terms from current results
+    const successfulTerms = new Set<string>();
+    currentResults.forEach(result => {
+      const titleTerms = result.title.toLowerCase().split(/\s+/);
+      titleTerms.forEach(term => {
+        if (term.length > 3) successfulTerms.add(term);
+      });
+    });
+
+    // Strategy 1: Combine successful terms with authority sources
+    const authoritySources = ['TechCrunch', 'Forbes', 'VentureBeat', 'Reuters', 'Bloomberg'];
+    if (successfulTerms.size > 0 && authoritySources[0]) {
+      const topTerms = Array.from(successfulTerms).slice(0, 3);
+      refinedQueries.push(`${topTerms.join(' ')} site:${authoritySources[0].toLowerCase()}.com`);
+    }
+
+    // Strategy 2: Add more specific industry terms
+    const firstQuery = originalQueries[0] || '';
+    if (firstQuery.includes('AI') || firstQuery.includes('artificial intelligence')) {
+      refinedQueries.push(`${firstQuery} machine learning deep learning`);
+    }
+    if (firstQuery.includes('startup')) {
+      refinedQueries.push(`${firstQuery} unicorn valuation funding series`);
+    }
+
+    // Strategy 3: Try broader terms if queries were too specific
+    if (originalQueries.length > 0 && originalQueries[0]) {
+      const broadQuery = originalQueries[0].split(' ').slice(0, 3).join(' ');
+      if (!originalQueries.includes(broadQuery)) {
+        refinedQueries.push(broadQuery);
+      }
+    }
+
+    return [...new Set(refinedQueries)].slice(0, 2);
   }
 
   /**

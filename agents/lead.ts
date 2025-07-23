@@ -163,17 +163,36 @@ Create a comprehensive research plan for this query: "${query.query}"
 
 You need to break this down into ${query.max_subagents || 3} focused research subtasks that can be executed in parallel by specialized search agents.
 
+IMPORTANT: Each subtask objective should be KEYWORD-FOCUSED and optimized for search engines, not full sentences or instructions. The search agents will use these objectives to generate effective search queries.
+
 For each subtask, provide:
-1. A clear, specific objective
-2. The search focus (what aspects to concentrate on)
+1. A clear, specific objective (use keywords, not full sentences)
+2. The search focus (specific keywords and aspects to concentrate on)
 3. Expected output format (what type of information to gather)
-4. Maximum number of searches to perform (default: 5)
+4. Maximum number of searches to perform (recommend 7-10 for comprehensive results)
+
+Guidelines for objectives:
+- Use KEYWORDS and PHRASES that search engines understand well
+- Include specific terms, company names, dates, industry terms
+- Avoid instructional words like "find", "identify", "research"
+- Focus on concrete, searchable concepts
+
+GOOD objective examples:
+- "top AI startups 2024 funding valuation"
+- "quantum computing companies IBM Google investment"
+- "fintech unicorns Europe series funding"
+
+BAD objective examples:
+- "Find the top AI startups that received funding in 2024"
+- "Research quantum computing companies and their investments"
+- "Identify European fintech unicorns with series funding"
 
 Consider:
 - Different perspectives and aspects of the topic
-- Authoritative sources and recent information
+- Authoritative sources and recent information  
 - Avoiding redundancy between subtasks
 - Ensuring comprehensive coverage
+- Using industry-specific terminology
 
 Respond with a JSON object:
 {
@@ -181,10 +200,10 @@ Respond with a JSON object:
   "estimated_complexity": "simple|moderate|complex",
   "subtasks": [
     {
-      "objective": "Clear, specific research objective",
-      "search_focus": "Specific aspect or perspective to focus on", 
+      "objective": "Keyword-focused research objective (NOT a full sentence)",
+      "search_focus": "Specific keywords and aspects to focus on", 
       "expected_output_format": "Description of expected findings format",
-      "max_searches": 5
+      "max_searches": 8
     }
   ]
 }
@@ -218,14 +237,14 @@ Respond with a JSON object:
         objective: query.query,
         search_focus: "Comprehensive information gathering",
         expected_output_format: "Key findings and insights",
-        max_searches: 5
+        max_searches: 8
       }
     ]).map((task: any) => ({
       task_id: generateTaskId(),
       objective: task.objective,
       search_focus: task.search_focus,
       expected_output_format: task.expected_output_format,
-      max_searches: task.max_searches || 5,
+      max_searches: task.max_searches || 8,
       status: 'pending' as const
     }));
 
@@ -359,13 +378,25 @@ ${results.map((r, i) => `${i + 1}. ${r.summary}`).join('\n')}
 
 Identify any gaps or areas that need additional research. Create follow-up tasks if needed.
 
+IMPORTANT: For additional_queries, provide KEYWORD-FOCUSED search queries that search engines will understand, NOT full sentences or instructions.
+
+GOOD query examples:
+- "AI startup funding Series A 2024"
+- "venture capital artificial intelligence investments"
+- "machine learning companies valuation Forbes"
+
+BAD query examples:
+- "Find AI startups that received Series A funding in 2024"
+- "Research venture capital investments in artificial intelligence"
+- "Identify machine learning companies with high valuations mentioned in Forbes"
+
 Respond with JSON:
 {
   "needs_followup": true/false,
   "followup_tasks": [
     {
       "reason": "Why this follow-up is needed",
-      "additional_queries": ["Specific search query 1", "Specific search query 2"],
+      "additional_queries": ["keyword-focused search query 1", "keyword-focused search query 2"],
       "focus_areas": ["focus area 1", "focus area 2"]
     }
   ]
@@ -428,7 +459,7 @@ Focus on creating authoritative, well-evidenced content that thoroughly answers 
     const synthesisResult = await this._callLLM([
       { role: 'system', content: 'You are synthesizing research findings into a comprehensive report.' },
       { role: 'user', content: synthesisPrompt }
-    ], { maxTokens: 2000, temperature: 0.3 });
+    ], { maxTokens: 2000, temperature: 1 });
 
     return synthesisResult.text;
   }
