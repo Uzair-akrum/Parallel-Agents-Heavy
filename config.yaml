@@ -18,7 +18,7 @@ orchestrator:
 
 tools:
   search:
-    max_results: 5     # Override with TOOLS_SEARCH_MAX_RESULTS
+    max_results: 8     # Override with TOOLS_SEARCH_MAX_RESULTS (increased for better coverage)
     timeout: 30        # Override with TOOLS_SEARCH_TIMEOUT
   calculator:
     precision: 10      # Override with TOOLS_CALCULATOR_PRECISION

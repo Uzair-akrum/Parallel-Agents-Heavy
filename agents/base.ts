@@ -22,6 +22,36 @@ export abstract class BaseAgent {
   }
 
   /**
+   * Check if the current model is an o1 series model
+   */
+  private isO1Model(): boolean {
+    return this.config.openrouter.model.includes('o3');
+  }
+
+  /**
+   * Create generation options with the correct token parameter
+   */
+  private createGenerationOptions(baseOptions: any): any {
+    const { maxTokens, temperature, ...otherOptions } = baseOptions;
+
+    if (this.isO1Model()) {
+      // o3 series models use max_completion_tokens and don't support custom temperature
+      return {
+        ...otherOptions,
+        maxCompletionTokens: maxTokens
+        // Temperature is omitted - o3 models only support default value of 1
+      };
+    } else {
+      // Other models use maxTokens and support temperature
+      return {
+        ...otherOptions,
+        maxTokens,
+        ...(temperature !== undefined && { temperature })
+      };
+    }
+  }
+
+  /**
    * Main conversation method with tool support
    */
   async run(input: string, maxIterations: number = 10): Promise<string> {
@@ -46,13 +76,15 @@ export abstract class BaseAgent {
         // Convert our tools to AI SDK format
         const aiTools = this.createAITools();
 
-        const result = await generateText({
+        const options = this.createGenerationOptions({
           model: this.model,
           messages,
           tools: aiTools,
           maxTokens: 2000,
           temperature: this.config.agent.temperature,
         });
+
+        const result = await generateText(options);
 
         // If no tool calls were made, we're done
         if (!result.toolCalls || result.toolCalls.length === 0) {
@@ -98,7 +130,7 @@ export abstract class BaseAgent {
    */
   async quickResponse(input: string): Promise<string> {
     try {
-      const result = await generateText({
+      const options = this.createGenerationOptions({
         model: this.model,
         messages: [
           {
@@ -113,6 +145,8 @@ export abstract class BaseAgent {
         maxTokens: 1000,
         temperature: this.config.agent.temperature,
       });
+
+      const result = await generateText(options);
 
       return result.text;
     } catch (error) {
@@ -129,7 +163,7 @@ export abstract class BaseAgent {
     console.log(`🤔 [BASE AGENT] THINKING: ${problem.slice(0, 60)}...`);
 
     try {
-      const result = await generateText({
+      const options = this.createGenerationOptions({
         model: this.model,
         messages: [
           {
@@ -144,6 +178,8 @@ export abstract class BaseAgent {
         maxTokens: 1500,
         temperature: 0.3, // Lower temperature for more structured thinking
       });
+
+      const result = await generateText(options);
 
       const duration = Date.now() - startTime;
       const tokenCount = this.countTokens(result.text);
@@ -209,8 +245,10 @@ export abstract class BaseAgent {
       generateOptions.tools = this.createAITools();
     }
 
+    const finalOptions = this.createGenerationOptions(generateOptions);
+
     try {
-      const result = await generateText(generateOptions);
+      const result = await generateText(finalOptions);
 
       const duration = Date.now() - startTime;
       const outputTokens = this.countTokens(result.text);
@@ -261,13 +299,14 @@ export abstract class BaseAgent {
 
     // Add search tool
     tools.search = tool({
-      description: 'Search the web using Brave Search API',
+      description: 'Search the web using Brave Search API with intelligent query optimization and result refinement',
       parameters: z.object({
         query: z.string().describe('Search query to execute'),
-        max_results: z.number().optional().describe('Maximum number of results (default: 5)')
+        max_results: z.number().optional().describe('Maximum number of results (default: 5)'),
+        enable_refinement: z.boolean().optional().describe('Enable automatic query refinement if initial results are poor (default: true)')
       }),
-      execute: async ({ query, max_results }: { query: string, max_results?: number | undefined }) => {
-        const result = await toolRegistry.executeTool('search', { query, max_results });
+      execute: async ({ query, max_results, enable_refinement }: { query: string, max_results?: number | undefined, enable_refinement?: boolean | undefined }) => {
+        const result = await toolRegistry.executeTool('search', { query, max_results, enable_refinement });
         return result.success ? result.result : result.error;
       }
     });
