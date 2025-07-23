@@ -21,8 +21,8 @@ class MultiAgentCLI {
 
   async initialize(): Promise<void> {
     try {
-      console.log('🎯 Make It Heavy - Multi-Agent Mode');
-      console.log('====================================');
+      console.log('🎯 Make It Heavy - Enhanced Multi-Agent Research Orchestrator');
+      console.log('================================================================');
 
       // Load configuration
       console.log('📁 Loading configuration...');
@@ -73,40 +73,47 @@ class MultiAgentCLI {
           continue;
         }
 
-        // Check if query is complex enough for multi-agent processing
+        // Assess query complexity for adaptive configuration
         const complexity = this.assessQueryComplexity(userInput);
 
-        if (complexity < 3) {
-          console.log('💡 This seems like a simple query. Consider using single-agent mode for faster results.');
-          const { proceed } = await enquirer.prompt<{ proceed: boolean }>({
-            type: 'confirm',
-            name: 'proceed',
-            message: 'Continue with multi-agent processing anyway?',
-            initial: true
-          });
+        // Use enhanced orchestrator for all queries with adaptive configuration
+        console.log('\n🔬 Using Enhanced Multi-Agent Research Orchestrator');
+        console.log(`📊 Query complexity: ${complexity >= 4 ? 'High' : complexity >= 2 ? 'Medium' : 'Low'}`)
 
-          if (!proceed) {
-            console.log('💨 Tip: Run with `npm run dev` for single-agent mode\n');
-            continue;
-          }
-        }
-
-        // Process with orchestrator
-        console.log('\n🎯 Initiating multi-agent processing...');
+        console.log(`\n🎯 Initiating enhanced multi-agent research...`);
         const startTime = Date.now();
 
-        const response_text = await this.orchestrator.processQuery(userInput);
+        // Use enhanced orchestrator with complexity-based settings
+        const researchOptions = complexity >= 4
+          ? { max_subagents: 4, max_iterations: 3 }  // Complex queries
+          : complexity >= 2
+            ? { max_subagents: 3, max_iterations: 2 }  // Medium queries
+            : { max_subagents: 2, max_iterations: 1 }; // Simple queries
+
+        console.log(`🎛️  Research Configuration:`);
+        console.log(`   - Max subagents: ${researchOptions.max_subagents}`);
+        console.log(`   - Max iterations: ${researchOptions.max_iterations}`);
+
+        const result = await this.orchestrator.conductResearch(userInput, researchOptions);
+        const response_text = result.report;
+        const researchId = result.research_id;
+
+        console.log(`\n📊 Research Statistics:`);
+        console.log(`   Research ID: ${result.research_id}`);
+        console.log(`   Sources Used: ${result.sources_used.length}`);
+        console.log(`   Tokens Used: ${result.total_tokens_used}`);
+        console.log(`   Citations: ${result.citations.length}`);
 
         const endTime = Date.now();
         const duration = ((endTime - startTime) / 1000).toFixed(2);
 
-        console.log(`\n🎭 Multi-Agent Response (${duration}s):`);
-        console.log('='.repeat(50));
+        console.log(`\n🎭 Enhanced Multi-Agent Research Response (${duration}s):`);
+        console.log('='.repeat(70));
         console.log(response_text);
-        console.log('='.repeat(50) + '\n');
+        console.log('='.repeat(70) + '\n');
 
-        // Save response to markdown file with title
-        await this.saveResponseToMarkdown(userInput, response_text, duration);
+        // Save enhanced research report to markdown file
+        await this.saveResearchToMarkdown(userInput, response_text, duration, researchId);
 
       } catch (error) {
         if (error instanceof Error && error.message.includes('canceled')) {
@@ -277,7 +284,7 @@ class MultiAgentCLI {
 
       case 'clear':
         console.clear();
-        console.log('🎯 Make It Heavy - Multi-Agent Mode\n');
+        console.log('🎯 Make It Heavy - Enhanced Multi-Agent Research Orchestrator\n');
         return true;
 
       case 'examples':
@@ -288,7 +295,30 @@ class MultiAgentCLI {
         this.showConfig();
         return true;
 
+      case 'research':
+      case 'multiagent':
+        this.showResearchHelp();
+        return true;
+
+      case 'status':
+        this.showActiveResearch();
+        return true;
+
       default:
+        // Check for research status command with ID
+        if (command.startsWith('status ')) {
+          const researchId = command.slice(7).trim();
+          this.checkResearchStatus(researchId);
+          return true;
+        }
+
+        // Check for result command with ID
+        if (command.startsWith('result ')) {
+          const researchId = command.slice(7).trim();
+          this.getResearchResult(researchId);
+          return true;
+        }
+
         return false;
     }
   }
@@ -302,16 +332,19 @@ class MultiAgentCLI {
   tools     - List available tools
   examples  - Show example complex queries
   config    - Show current configuration
+  research  - Show multi-agent research commands
+  status    - List active research sessions
   clear     - Clear the screen  
   quit/exit - Exit the application
 
-🎭 Multi-Agent Mode:
-  This mode is designed for complex questions that benefit from multiple perspectives
-  or require breaking down into sub-tasks. The orchestrator will:
-  
-  1. 📋 Break your question into focused sub-questions
-  2. 🚀 Process them in parallel with specialized agents
-  3. 🔄 Synthesize all responses into a comprehensive answer
+🔬 Enhanced Multi-Agent Research System:
+  - Full orchestrator with Lead Agent coordination
+  - Specialized search subagents with parallel execution  
+  - Automatic citation and bibliography generation
+  - Detailed logging and progress tracking
+  - Iterative research with follow-up tasks
+  - Memory persistence and session management
+  - Adaptive complexity-based resource allocation
 
 💡 Best suited for:
   - Research questions requiring multiple sources
@@ -373,6 +406,117 @@ class MultiAgentCLI {
       console.log(`  Editor command: ${this.config.input.editor_command}`);
     }
     console.log();
+  }
+
+  private showResearchHelp(): void {
+    console.log(`
+🔬 Multi-Agent Research Commands:
+
+  research          - Show this research help
+  status            - List all active research sessions
+  status <id>       - Check status of specific research
+  result <id>       - Get result of completed research
+
+🎯 Enhanced Multi-Agent Research Orchestrator:
+  Every query automatically uses the full orchestrator system:
+  - Complete orchestrator workflow with Lead Agent coordination
+  - Multi-tier agent system (Lead → Search Subagents → Citation Agent)
+  - Real-time detailed logging of every step and decision
+  - Adaptive complexity-based resource allocation
+
+✨ Full Orchestrator Features:
+  - Intelligent research planning with task breakdown
+  - Parallel specialized search agents with quality evaluation  
+  - Iterative research with automated follow-up task generation
+  - Automatic source citation and bibliography with inline references
+  - Persistent memory across sessions with Redis storage
+  - Comprehensive error handling and fallback procedures
+  - Token usage tracking and performance optimization
+
+🎛️  Adaptive Configuration (automatic):
+  - High complexity: 4 subagents, 3 iterations
+  - Medium complexity: 3 subagents, 2 iterations  
+  - Low complexity: 2 subagents, 1 iteration
+
+💡 Perfect for any research task - from simple questions to complex investigations!
+`);
+  }
+
+  private async showActiveResearch(): Promise<void> {
+    if (!this.orchestrator) return;
+
+    try {
+      const activeResearch = await this.orchestrator.getActiveResearch();
+
+      if (activeResearch.length === 0) {
+        console.log('\n📊 No active research sessions found.');
+      } else {
+        console.log(`\n📊 Active Research Sessions (${activeResearch.length}):`);
+        for (const researchId of activeResearch) {
+          const status = await this.orchestrator.getResearchStatus(researchId);
+          console.log(`  ${researchId}: ${status || 'unknown'}`);
+        }
+      }
+      console.log();
+    } catch (error) {
+      console.error('❌ Failed to list active research:', error instanceof Error ? error.message : 'Unknown error');
+    }
+  }
+
+  private async checkResearchStatus(researchId: string): Promise<void> {
+    if (!this.orchestrator) return;
+
+    try {
+      const status = await this.orchestrator.getResearchStatus(researchId);
+
+      if (status) {
+        console.log(`\n📊 Research Status: ${researchId}`);
+        console.log(`   Status: ${status}`);
+
+        if (status === 'completed') {
+          console.log('   ✅ Research is complete! Use "result ' + researchId + '" to get results.');
+        } else if (status.startsWith('failed')) {
+          console.log('   ❌ Research failed: ' + status.slice(8));
+        } else {
+          console.log('   🔄 Research is still in progress...');
+        }
+      } else {
+        console.log(`\n❌ Research session not found: ${researchId}`);
+      }
+      console.log();
+    } catch (error) {
+      console.error('❌ Failed to check research status:', error instanceof Error ? error.message : 'Unknown error');
+    }
+  }
+
+  private async getResearchResult(researchId: string): Promise<void> {
+    if (!this.orchestrator) return;
+
+    try {
+      const result = await this.orchestrator.getResearchResult(researchId);
+
+      if (result) {
+        console.log(`\n📋 Research Result: ${researchId}`);
+        console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
+        console.log(`📝 Query: ${result.query}`);
+        console.log(`⏱️  Execution Time: ${result.execution_time}ms`);
+        console.log(`📊 Tokens Used: ${result.total_tokens_used}`);
+        console.log(`📚 Sources: ${result.sources_used.length}`);
+        console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`);
+        console.log(result.report);
+        console.log(`\n💾 Saving result to file: research_${researchId}.md`);
+
+        // Save to file
+        await fs.writeFile(`research_${researchId}.md`, result.report);
+        console.log('✅ Result saved to file!');
+      } else {
+        console.log(`\n❌ Research result not found: ${researchId}`);
+        console.log('   The research may still be running or may have failed.');
+      }
+      console.log();
+    } catch (error) {
+      console.error('❌ Failed to get research result:', error instanceof Error ? error.message : 'Unknown error');
+    }
   }
 
   private assessQueryComplexity(query: string): number {
@@ -437,6 +581,46 @@ ${response}
       console.log(`📄 Response saved to: ${path.relative(process.cwd(), fullPath)}`);
     } catch (error) {
       console.error('❌ Failed to save response to markdown file:', error instanceof Error ? error.message : 'Unknown error');
+    }
+  }
+
+  private async saveResearchToMarkdown(query: string, response: string, duration: string, researchId: string): Promise<void> {
+    if (!this.config) {
+      console.error('Config not loaded, cannot save research.');
+      return;
+    }
+
+    const timestamp = new Date().toISOString().replace(/[:.-]/g, '');
+    const filename = `research-${timestamp}.md`;
+    const outputDir = path.join(process.cwd(), 'responses');
+
+    try {
+      const fullPath = path.join(outputDir, filename);
+      await fs.mkdir(outputDir, { recursive: true });
+
+      // Generate a title
+      const title = this.generateChatTitle(query);
+
+      const markdownContent = `# ${title}
+
+**Research Query:**
+${query}
+
+**Enhanced Multi-Agent Research Report:**
+${response}
+
+**Research ID:** ${researchId}
+**Processing Duration:** ${duration}s
+**Generated:** ${new Date().toISOString()}
+
+---
+*This report was generated using enhanced multi-agent research with automatic citation and bibliography.*
+`;
+
+      await fs.writeFile(fullPath, markdownContent);
+      console.log(`📄 Research report saved to: ${path.relative(process.cwd(), fullPath)}`);
+    } catch (error) {
+      console.error('❌ Failed to save research report:', error instanceof Error ? error.message : 'Unknown error');
     }
   }
 
