@@ -142,101 +142,98 @@ export class SearchSubAgent extends BaseAgent {
    * Generate targeted search queries based on task objective
    */
   private async _generateSearchQueries(task: SubAgentTask): Promise<string[]> {
-    const queryPrompt = `
-Generate 3-5 targeted search queries for this research task. Focus on creating KEYWORD-BASED queries that search engines will understand, not full sentences or instructions.
+    // Primary strategy: Generate deterministic keyword-based queries
+    console.log(`[SEARCH AGENT] Generating queries for objective: "${task.objective}"`);
+
+    // Extract key terms deterministically
+    const keyTerms = this._extractKeyTermsFromTask(task.objective.toLowerCase(), task.search_focus.toLowerCase());
+    console.log(`[SEARCH AGENT] Extracted key terms: ${keyTerms.join(', ')}`);
+
+    // Generate initial keyword-focused queries
+    const deterministicQueries = this._generateDeterministicQueries(task, keyTerms);
+    console.log(`[SEARCH AGENT] Generated ${deterministicQueries.length} deterministic queries`);
+
+    // Try LLM enhancement only as a secondary strategy
+    let enhancedQueries: string[] = [];
+    try {
+      const queryPrompt = `
+Generate 2-3 additional keyword-based search queries for this research task. Focus on creating KEYWORD-BASED queries that search engines will understand.
 
 **Objective:** ${task.objective}
 **Search Focus:** ${task.search_focus}
-**Expected Output:** ${task.expected_output_format}
+**Existing queries:** ${deterministicQueries.join(', ')}
 
-IMPORTANT GUIDELINES:
-1. Use KEYWORDS and PHRASES, not full sentences
-2. Avoid instructional words like "find", "search for", "identify", "look for"
-3. Include specific terms, company names, dates, numbers
-4. Add temporal constraints (2024, 2025, recent) for current information
-5. Use quotes for exact phrases when needed
-6. Consider different aspects and synonyms
+CRITICAL: Use KEYWORDS and PHRASES only, not full sentences. Include specific terms, company names, dates, numbers.
 
-GOOD EXAMPLES:
-- "top AI startups 2024 funding"
-- "unicorn startups artificial intelligence 2025"
-- "venture capital AI companies Forbes TechCrunch"
-
-BAD EXAMPLES:
-- "Identify the top 3 AI startups recognized by authoritative media"
-- "Find information about recent AI startup funding"
-- "Search for the best artificial intelligence companies"
-
-Respond with a JSON array of KEYWORD-BASED search query strings:
-["query 1", "query 2", "query 3", ...]
-
-Focus on creating queries that search engines will rank highly for relevant, authoritative sources.
+Respond with ONLY a JSON array of query strings: ["query 1", "query 2"]
 `;
 
-    const result = await this.think(queryPrompt);
+      const result = await this.think(queryPrompt);
 
-    if (result.error) {
-      // Improved fallback queries with keyword focus
-      const keywordQueries = this._generateKeywordFallbackQueries(task);
-      console.log(`[SEARCH AGENT] Query generation failed, using keyword fallbacks: ${keywordQueries.join(', ')}`);
-      return keywordQueries;
-    }
-
-    // Extract query array from result
-    let queries = result.queries || result.searchQueries || [];
-
-    if (Array.isArray(result) && result.length > 0) {
-      queries = result;
-    } else if (typeof result === 'object' && result.analysis) {
-      try {
-        const arrayMatch = result.analysis.match(/\[(.*?)\]/);
-        if (arrayMatch) {
-          queries = JSON.parse(`[${arrayMatch[1]}]`);
+      if (!result.error && result.analysis) {
+        try {
+          const arrayMatch = result.analysis.match(/\[(.*?)\]/);
+          if (arrayMatch) {
+            enhancedQueries = JSON.parse(`[${arrayMatch[1]}]`)
+              .map((q: string) => this._optimizeQueryForSearch(q, task))
+              .filter((q: string) => q.length > 0);
+          }
+        } catch (parseError) {
+          console.warn('[SEARCH AGENT] Failed to parse enhanced queries from LLM');
         }
-      } catch (parseError) {
-        console.warn('Failed to parse search queries from analysis');
       }
+    } catch (error) {
+      console.warn('[SEARCH AGENT] LLM query enhancement failed, using deterministic queries only');
     }
 
-    // Ensure we have valid queries and optimize them
-    if (!Array.isArray(queries) || queries.length === 0) {
-      queries = this._generateKeywordFallbackQueries(task);
-    }
+    // Combine and deduplicate
+    const allQueries = [...deterministicQueries, ...enhancedQueries];
+    const uniqueQueries = [...new Set(allQueries)].slice(0, 5);
 
-    // Clean and optimize the queries
-    const optimizedQueries = queries
-      .slice(0, 5) // Limit to 5 queries max
-      .map((q: string) => this._optimizeQueryForSearch(q, task))
-      .filter((q: string) => q.length > 0);
-
-    return optimizedQueries.length > 0 ? optimizedQueries : this._generateKeywordFallbackQueries(task);
+    console.log(`[SEARCH AGENT] Final query set: ${uniqueQueries.join(', ')}`);
+    return uniqueQueries;
   }
 
   /**
-   * Generate keyword-focused fallback queries
+   * Generate deterministic keyword-based queries without LLM dependency
    */
-  private _generateKeywordFallbackQueries(task: SubAgentTask): string[] {
-    const objective = task.objective.toLowerCase();
-    const focus = task.search_focus.toLowerCase();
-
-    // Extract key terms
-    const keyTerms = this._extractKeyTermsFromTask(objective, focus);
-
+  private _generateDeterministicQueries(task: SubAgentTask, keyTerms: string[]): string[] {
     const queries: string[] = [];
+    const objective = task.objective.toLowerCase();
 
-    // Primary query: main keywords
-    queries.push(keyTerms.slice(0, 4).join(' '));
-
-    // Secondary query: add temporal constraints
-    queries.push(`${keyTerms.slice(0, 3).join(' ')} 2024 2025`);
-
-    // Tertiary query: add authority sources
-    if (objective.includes('startup') || objective.includes('company')) {
-      queries.push(`${keyTerms.slice(0, 3).join(' ')} TechCrunch Forbes`);
+    // Query 1: Core keywords with date constraint
+    if (keyTerms.length >= 2) {
+      queries.push(`${keyTerms.slice(0, 4).join(' ')} 2024 2025`);
     }
 
-    return queries.slice(0, 3);
+    // Query 2: Add authority sources for credible results
+    if (keyTerms.length >= 2) {
+      if (objective.includes('startup') || objective.includes('company')) {
+        queries.push(`${keyTerms.slice(0, 3).join(' ')} TechCrunch Forbes VentureBeat`);
+      } else if (objective.includes('ai') || objective.includes('artificial intelligence')) {
+        queries.push(`${keyTerms.slice(0, 3).join(' ')} AI technology`);
+      } else {
+        queries.push(`${keyTerms.slice(0, 3).join(' ')} industry report`);
+      }
+    }
+
+    // Query 3: Broader keywords for coverage
+    if (keyTerms.length >= 3) {
+      queries.push(keyTerms.slice(0, 3).join(' '));
+    }
+
+    // Query 4: Specific domain focus if applicable
+    if (objective.includes('ranking') || objective.includes('top') || objective.includes('best')) {
+      const rankingTerms = keyTerms.filter(term => !['ranking', 'top', 'best'].includes(term));
+      if (rankingTerms.length >= 2) {
+        queries.push(`top ${rankingTerms.slice(0, 2).join(' ')} ranking list`);
+      }
+    }
+
+    return queries.filter(q => q.length > 0);
   }
+
+
 
   /**
    * Extract key terms from task objective and focus
@@ -288,166 +285,168 @@ Focus on creating queries that search engines will rank highly for relevant, aut
 
     console.log(`[SEARCH AGENT] Executing ${queries.length} searches with ~${resultsPerQuery} results each`);
 
-    // Perform searches sequentially to respect rate limits (not parallel)
-    const searchResultArrays: SearchResult[][] = [];
-
-    for (const query of queries) {
+    // Perform searches sequentially to respect rate limits
+    for (let i = 0; i < queries.length; i++) {
+      const query = queries[i];
       try {
-        console.log(`[SEARCH AGENT] Searching: "${query}"`);
+        console.log(`[SEARCH AGENT] Searching (${i + 1}/${queries.length}): "${query}"`);
 
-        // Call the search tool directly with optimization enabled
-        const searchResult = await this._callLLM([
-          { role: 'system', content: 'You are a search assistant. Use the search tool to find information.' },
-          { role: 'user', content: query }
-        ], {
-          maxTokens: 1000,
-          temperature: 0.1,
-          tools: true
-        });
+        // Call the search tool directly via the tool registry (bypassing LLM tool calling)
+        console.log(`[SEARCH AGENT] Calling search tool directly with query: "${query}"`);
 
-        // Parse search results from response
-        const results = this._parseSearchResponse(searchResult.text, query);
+        const toolResult = await import('../tools/index.js').then(module =>
+          module.toolRegistry.executeTool('search', {
+            query: query,
+            max_results: resultsPerQuery,
+            enable_refinement: false
+          })
+        );
+
+        let results: SearchResult[] = [];
+
+        if (toolResult.success && toolResult.result) {
+          console.log(`[SEARCH AGENT] Search tool succeeded, result type: ${typeof toolResult.result}`);
+          console.log(`[SEARCH AGENT] Result preview: ${String(toolResult.result).substring(0, 200)}...`);
+
+          // Parse the search tool's formatted output
+          results = this._parseSearchResponse(String(toolResult.result), query);
+        } else {
+          console.warn(`[SEARCH AGENT] Search tool failed: ${toolResult.error || 'No result returned'}`);
+        }
         console.log(`[SEARCH AGENT] Found ${results.length} results for: "${query}"`);
 
-        searchResultArrays.push(results);
+        // Add new unique results
+        for (const result of results) {
+          if (!allResults.some(existing => existing.url === result.url) && allResults.length < maxResults) {
+            allResults.push(result);
+          }
+        }
+
+        // Add small delay between searches to respect rate limits
+        if (i < queries.length - 1) {
+          await new Promise(resolve => setTimeout(resolve, 500));
+        }
+
       } catch (error) {
         console.warn(`[SEARCH AGENT] Search failed for "${query}": ${error}`);
-        searchResultArrays.push([]);
+        continue;
       }
     }
 
-    // Flatten and deduplicate results
-    for (const resultArray of searchResultArrays) {
-      for (const result of resultArray) {
-        if (!allResults.some(existing => existing.url === result.url)) {
-          allResults.push(result);
-        }
-      }
-    }
-
-    // If we didn't get enough results, try additional refined searches
-    if (allResults.length < maxResults * 0.6 && allResults.length < maxResults) {
-      console.log(`[SEARCH AGENT] Initial search yielded ${allResults.length} results, trying refinements...`);
-
-      const additionalQueries = this._generateRefinedQueries(queries, allResults);
-
-      for (const refinedQuery of additionalQueries) {
-        if (allResults.length >= maxResults) break;
-
-        try {
-          console.log(`[SEARCH AGENT] Refined search: "${refinedQuery}"`);
-
-          // Add a small delay between refined searches to be extra safe with rate limits
-          await new Promise(resolve => setTimeout(resolve, 500));
-
-          const searchResult = await this._callLLM([
-            { role: 'system', content: 'You are a search assistant. Use the search tool to find information.' },
-            { role: 'user', content: refinedQuery }
-          ], {
-            maxTokens: 1000,
-            temperature: 0.1,
-            tools: true
-          });
-
-          const results = this._parseSearchResponse(searchResult.text, refinedQuery);
-          console.log(`[SEARCH AGENT] Refined search found ${results.length} additional results`);
-
-          // Add new unique results
-          for (const result of results) {
-            if (!allResults.some(existing => existing.url === result.url) && allResults.length < maxResults) {
-              allResults.push(result);
-            }
-          }
-        } catch (error) {
-          console.warn(`[SEARCH AGENT] Refined search failed for "${refinedQuery}": ${error}`);
-          continue;
-        }
-      }
-    }
-
+    console.log(`[SEARCH AGENT] Total unique results collected: ${allResults.length}`);
     return allResults.slice(0, maxResults);
   }
 
-  /**
-   * Generate refined queries based on initial results
-   */
-  private _generateRefinedQueries(originalQueries: string[], currentResults: SearchResult[]): string[] {
-    const refinedQueries: string[] = [];
-
-    // Extract successful terms from current results
-    const successfulTerms = new Set<string>();
-    currentResults.forEach(result => {
-      const titleTerms = result.title.toLowerCase().split(/\s+/);
-      titleTerms.forEach(term => {
-        if (term.length > 3) successfulTerms.add(term);
-      });
-    });
-
-    // Strategy 1: Combine successful terms with authority sources
-    const authoritySources = ['TechCrunch', 'Forbes', 'VentureBeat', 'Reuters', 'Bloomberg'];
-    if (successfulTerms.size > 0 && authoritySources[0]) {
-      const topTerms = Array.from(successfulTerms).slice(0, 3);
-      refinedQueries.push(`${topTerms.join(' ')} site:${authoritySources[0].toLowerCase()}.com`);
-    }
-
-    // Strategy 2: Add more specific industry terms
-    const firstQuery = originalQueries[0] || '';
-    if (firstQuery.includes('AI') || firstQuery.includes('artificial intelligence')) {
-      refinedQueries.push(`${firstQuery} machine learning deep learning`);
-    }
-    if (firstQuery.includes('startup')) {
-      refinedQueries.push(`${firstQuery} unicorn valuation funding series`);
-    }
-
-    // Strategy 3: Try broader terms if queries were too specific
-    if (originalQueries.length > 0 && originalQueries[0]) {
-      const broadQuery = originalQueries[0].split(' ').slice(0, 3).join(' ');
-      if (!originalQueries.includes(broadQuery)) {
-        refinedQueries.push(broadQuery);
-      }
-    }
-
-    return [...new Set(refinedQueries)].slice(0, 2);
-  }
 
   /**
-   * Parse search response into SearchResult objects
+   * Parse search response into SearchResult objects - Fixed to handle actual SearchTool format
    */
   private _parseSearchResponse(response: string, query: string): SearchResult[] {
     const results: SearchResult[] = [];
 
-    // Look for search result patterns in the response
-    const resultPattern = /(\d+)\.\s\*\*(.*?)\*\*\s*URL:\s*(https?:\/\/[^\s]+)\s*(.*?)(?=\d+\.\s|\n\n|$)/g;
+    console.log(`[SEARCH AGENT] Parsing search response for "${query}"`);
+    console.log(`[SEARCH AGENT] Response length: ${response.length} characters`);
+
+    // Handle the actual format returned by SearchTool:
+    // "Search results for 'query':
+    // 
+    // Found X results...
+    // 
+    // 1. **Title** 🏛️
+    //    URL: http://example.com
+    //    Snippet text
+    //
+    // 2. **Title**
+    //    URL: http://example2.com
+    //    Snippet text"
+
+    // First, try to parse the structured format with proper line breaks
+    const structuredPattern = /(\d+)\.\s*\*\*(.*?)\*\*[^\n]*\n\s*URL:\s*(https?:\/\/[^\s\n]+)\n\s*(.*?)(?=\n\s*\d+\.\s*\*\*|\n\n|$)/gs;
 
     let match;
-    while ((match = resultPattern.exec(response)) !== null) {
+    while ((match = structuredPattern.exec(response)) !== null) {
       const [, , title, url, snippet] = match;
 
       if (title && url) {
+        const cleanTitle = title.trim().replace(/[🏛️📰🔬💼🌐]/g, ''); // Remove emoji indicators
+        const cleanSnippet = (snippet || '').trim().replace(/Content:\s*/, ''); // Remove "Content:" prefix if present
+
         results.push({
-          title: title.trim(),
+          title: cleanTitle,
           url: url.trim(),
-          snippet: (snippet || '').trim(),
-          relevance_score: 0.5 // Will be updated in evaluation
+          snippet: cleanSnippet,
+          relevance_score: 0.7 // Higher initial score for properly parsed results
         });
       }
     }
 
-    // If no structured results found, try to extract URLs and titles differently
+    // If structured parsing didn't work, try alternative patterns
     if (results.length === 0) {
-      const urlPattern = /https?:\/\/[^\s]+/g;
-      const urls = response.match(urlPattern) || [];
+      console.log(`[SEARCH AGENT] Structured parsing failed, trying alternative patterns`);
 
-      urls.forEach((url, index) => {
-        results.push({
-          title: `Search result ${index + 1}`,
-          url,
-          snippet: 'Content from search results',
-          relevance_score: 0.4
-        });
-      });
+      // Try single-line format: "1. **Title** URL: http://... snippet"
+      const singleLinePattern = /(\d+)\.\s*\*\*(.*?)\*\*\s*URL:\s*(https?:\/\/[^\s]+)\s*(.*?)(?=\d+\.\s*\*\*|\n\n|$)/g;
+
+      while ((match = singleLinePattern.exec(response)) !== null) {
+        const [, , title, url, snippet] = match;
+
+        if (title && url) {
+          results.push({
+            title: title.trim(),
+            url: url.trim(),
+            snippet: (snippet || '').trim(),
+            relevance_score: 0.6
+          });
+        }
+      }
     }
 
+    // If still no results, try to extract any URLs and titles we can find
+    if (results.length === 0) {
+      console.log(`[SEARCH AGENT] Standard parsing failed, trying URL extraction`);
+
+      // Look for any URLs in the response
+      const urlPattern = /https?:\/\/[^\s\n]+/g;
+      const urls = response.match(urlPattern) || [];
+
+      // Look for any titles in **bold** format
+      const titlePattern = /\*\*(.*?)\*\*/g;
+      const titles: string[] = [];
+      let titleMatch;
+      while ((titleMatch = titlePattern.exec(response)) !== null) {
+        if (titleMatch[1]) {
+          titles.push(titleMatch[1]);
+        }
+      }
+
+      // Pair URLs with titles if possible
+      const maxResults = Math.min(urls.length, Math.max(titles.length, 3));
+      for (let i = 0; i < maxResults; i++) {
+        const currentUrl = urls[i];
+        if (currentUrl) {
+          results.push({
+            title: titles[i] || `Search result ${i + 1} for "${query}"`,
+            url: currentUrl,
+            snippet: `Found via search for: ${query}`,
+            relevance_score: 0.4
+          });
+        }
+      }
+    }
+
+    // If we still have no results, check if the search tool returned an error or "no results" message
+    if (results.length === 0) {
+      if (response.toLowerCase().includes('no results found') ||
+        response.toLowerCase().includes('no significant findings') ||
+        response.toLowerCase().includes('rate limit')) {
+        console.log(`[SEARCH AGENT] Search tool reported no results or rate limiting for "${query}"`);
+      } else {
+        console.warn(`[SEARCH AGENT] Could not parse any results from response for "${query}"`);
+        console.warn(`[SEARCH AGENT] Response sample: ${response.substring(0, 200)}...`);
+      }
+    }
+
+    console.log(`[SEARCH AGENT] Successfully parsed ${results.length} results from response`);
     return results;
   }
 
