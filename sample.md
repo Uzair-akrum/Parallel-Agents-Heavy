@@ -326,3 +326,7 @@ const response = await enquirer.prompt<{ userInput: string }>({
 ---
 
 Let me know if you need this to be adapted for a specific use case or want more details!
+
+
+
+give list of top 3 ai companies this month

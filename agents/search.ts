@@ -309,7 +309,7 @@ Respond with ONLY a JSON array of query strings: ["query 1", "query 2"]
           console.log(`[SEARCH AGENT] Result preview: ${String(toolResult.result).substring(0, 200)}...`);
 
           // Parse the search tool's formatted output
-          results = this._parseSearchResponse(String(toolResult.result), query);
+          results = this._parseSearchResponse(String(toolResult.result || ''), query as string);
         } else {
           console.warn(`[SEARCH AGENT] Search tool failed: ${toolResult.error || 'No result returned'}`);
         }
